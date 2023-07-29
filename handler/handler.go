@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"errors"
 	"github.com/lilhammer111/hammer-cloud/meta"
 	"github.com/lilhammer111/hammer-cloud/util"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -66,4 +70,123 @@ func UploadSucHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+}
+
+func GetFileMetaHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		err := r.ParseForm()
+		if err != nil {
+			// judge if the error is caused by bad request.
+			var er *url.Error
+			if errors.As(err, &er) {
+				http.Error(w, "Wrong request format", http.StatusBadRequest)
+			} else {
+				http.Error(w, "服务器内部错误", http.StatusInternalServerError)
+			}
+			return
+		}
+		filehash := r.Form["filehash"][0]
+		fMeta := meta.GetFileMeta(filehash)
+		data, err := json.Marshal(fMeta)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	} else {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+}
+
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	fsha1 := r.Form.Get("filehash")
+	fm := meta.GetFileMeta(fsha1)
+	f, err := os.Open(fm.Location)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octect-stream")
+	w.Header().Set("Content-Disposition", "attachment;filename=\""+fm.FileName+"\"")
+
+	_, err = w.Write(data)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
+func FileMetaUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	opType := r.Form.Get("op")
+
+	if opType != "0" {
+		http.Error(w, "Access Denied", http.StatusForbidden)
+		return
+	}
+
+	fileSha1 := r.Form.Get("filehash")
+	newFileName := r.Form.Get("filename")
+
+	curFileMeta := meta.GetFileMeta(fileSha1)
+	curFileMeta.FileName = newFileName
+	meta.UpdateFileMeta(curFileMeta)
+
+	data, err := json.Marshal(curFileMeta)
+	if err != nil {
+		log.Println()
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	fileSha1 := r.Form.Get("filehash")
+	fMeta := meta.GetFileMeta(fileSha1)
+
+	// delete file by path
+	err = os.Remove(fMeta.Location)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	// delete meta info
+	meta.RemoveFileMeta(fileSha1)
+
+	w.WriteHeader(http.StatusOK)
 }

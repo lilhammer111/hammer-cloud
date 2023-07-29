@@ -24,3 +24,18 @@ func UpdateFileMeta(fmeta FileMeta) {
 func GetFileMeta(fileSha1 string) FileMeta {
 	return fileMetas[fileSha1]
 }
+
+//func GetLastFileMetas(count int) []FileMeta {
+//	fMetaArray := make([]FileMeta, len(fileMetas))
+//	for _, v := range fileMetas {
+//		fMetaArray = append(fMetaArray, v)
+//	}
+//	sort.Sort(ByUploadTime(fMetaArray))
+//	return fMetaArray[0:count]
+//
+//}
+
+// RemoveFileMeta removes a file meta info from fileMetas.
+func RemoveFileMeta(fileSha1 string) {
+	delete(fileMetas, fileSha1)
+}
