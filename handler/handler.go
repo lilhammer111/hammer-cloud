@@ -15,7 +15,7 @@ import (
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		html, err := os.ReadFile("./static/view/index.html")
+		html, err := os.ReadFile("./static/view/upload.html")
 		if err != nil {
 			io.WriteString(w, "Internal Server")
 			return
@@ -59,8 +59,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		nf.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(nf)
-		meta.UpdateFileMeta(fileMeta)
-
+		//meta.UpdateFileMeta(fileMeta)
+		_ = meta.UpdateFileMetaDB(fileMeta)
 		http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
 	}
 }
@@ -81,12 +81,17 @@ func GetFileMetaHandler(w http.ResponseWriter, r *http.Request) {
 			if errors.As(err, &er) {
 				http.Error(w, "Wrong request format", http.StatusBadRequest)
 			} else {
-				http.Error(w, "服务器内部错误", http.StatusInternalServerError)
+				http.Error(w, "internal error", http.StatusInternalServerError)
 			}
 			return
 		}
 		filehash := r.Form["filehash"][0]
-		fMeta := meta.GetFileMeta(filehash)
+		fMeta, err := meta.GetFileMetaDB(filehash)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
 		data, err := json.Marshal(fMeta)
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -110,7 +115,12 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fsha1 := r.Form.Get("filehash")
-	fm := meta.GetFileMeta(fsha1)
+	fm, err := meta.GetFileMetaDB(fsha1)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	f, err := os.Open(fm.Location)
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -154,9 +164,15 @@ func FileMetaUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	fileSha1 := r.Form.Get("filehash")
 	newFileName := r.Form.Get("filename")
 
-	curFileMeta := meta.GetFileMeta(fileSha1)
+	curFileMeta, err := meta.GetFileMetaDB(fileSha1)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	curFileMeta.FileName = newFileName
-	meta.UpdateFileMeta(curFileMeta)
+	//meta.UpdateFileMeta(curFileMeta)
+	_ = meta.UpdateFileMetaDB(curFileMeta)
 
 	data, err := json.Marshal(curFileMeta)
 	if err != nil {
@@ -176,7 +192,11 @@ func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileSha1 := r.Form.Get("filehash")
-	fMeta := meta.GetFileMeta(fileSha1)
+	fMeta, err := meta.GetFileMetaDB(fileSha1)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
 
 	// delete file by path
 	err = os.Remove(fMeta.Location)
