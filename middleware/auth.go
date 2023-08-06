@@ -2,20 +2,20 @@ package middleware
 
 import "net/http"
 
-func TokenAuthMDW(h http.HandlerFunc) http.HandlerFunc {
+func TokenAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
-		err := r.ParseForm()
-		if err != nil {
-			http.Error(w, "wrong parameter", http.StatusBadRequest)
-			return
-		}
-		username := r.Form.Get("username")
-		if len(username) < 3 || !IsTokenValid(token) {
+		//err := r.ParseForm()
+		//if err != nil {
+		//	http.Error(w, "wrong parameter", http.StatusBadRequest)
+		//	return
+		//}
+		//username := r.Form.Get("username")
+		if !IsTokenValid(token) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// h(w, r) is also right here
+		// h(w, rd) is also right here
 		h.ServeHTTP(w, r)
 	}
 }

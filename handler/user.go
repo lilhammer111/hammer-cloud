@@ -90,7 +90,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// redirect to home, however, by the return path to home instead
-	//_, err = w.Write([]byte("http://" + r.Host + "/static/view/home.html"))
+	//_, err = w.Write([]byte("http://" + rd.Host + "/static/view/home.html"))
 	//if err != nil {
 	//	log.Println(err)
 	//	return

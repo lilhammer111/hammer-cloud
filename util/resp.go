@@ -13,8 +13,8 @@ type RespBody struct {
 	Data interface{} `json:"data"`
 }
 
-// NewRespMsg : 生成response对象
-func NewRespMsg(code int, msg string, data interface{}) *RespBody {
+// NewRespBody : 生成response对象
+func NewRespBody(code int, msg string, data interface{}) *RespBody {
 	return &RespBody{
 		Code: code,
 		Msg:  msg,
