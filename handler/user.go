@@ -2,11 +2,11 @@ package handler
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/lilhammer111/hammer-cloud/db"
 	"github.com/lilhammer111/hammer-cloud/util"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -16,77 +16,61 @@ const (
 
 // SignUpHandler parse username and pwd field from frontend, and encrypt the pwd.
 // And then invoke internally UserSignUp to insert user info into DB
-func SignUpHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		html, err := os.ReadFile("./static/view/signup.html")
-		if err != nil {
-			http.Error(w, "internal server", http.StatusNotFound)
-			return
-		}
+func DoSignUpHandler(c *gin.Context) {
+	username := c.Request.FormValue("username")
+	pwd := c.Request.FormValue("password")
 
-		_, err = w.Write(html)
-		if err != nil {
-			http.Error(w, "internal server", http.StatusInternalServerError)
-			return
-		}
+	if len(username) < 3 || len(pwd) < 5 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg":  "invalid parameter",
+			"code": -1,
+		})
 		return
 	}
 
-	if r.Method == http.MethodPost {
-		err := r.ParseForm()
-		if err != nil {
-			http.Error(w, "internal server", http.StatusInternalServerError)
-			return
-		}
+	encryptPWD := util.Sha1([]byte(pwd + pwdSalt))
 
-		username := r.Form.Get("username")
-		passwd := r.Form.Get("passwd")
-
-		if len(username) < 3 || len(passwd) < 5 {
-			http.Error(w, "invalid parameter", http.StatusBadRequest)
-			return
-		}
-
-		encPasswd := util.Sha1([]byte(passwd + pwdSalt))
-
-		if ok := db.UserSignUp(username, encPasswd); ok {
-			_, err := w.Write([]byte("signup success"))
-			if err != nil {
-				log.Println(err)
-			}
-		} else {
-			_, err := w.Write([]byte("signup fail "))
-			if err != nil {
-				log.Println(err)
-			}
-		}
-		return
+	if ok := db.UserSignUp(username, encryptPWD); ok {
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "login succeeded",
+			"code": 0,
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "login failed",
+			"code": -2,
+		})
 	}
-
-	http.Error(w, "wrong request method", http.StatusBadRequest)
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		return
-	}
-	username := r.Form.Get("username")
-	pwd := r.Form.Get("password")
+func SignUpHandler(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/static/view/signup.html")
+}
+
+func DoLoginHandler(c *gin.Context) {
+	username := c.Request.FormValue("username")
+	pwd := c.Request.FormValue("password")
 
 	// validates username or pwd
-	encpwd := util.Sha1([]byte(pwd + pwdSalt))
-	checked := db.UserLogin(username, encpwd)
-	if !checked {
-		http.Error(w, "invalid username or password", http.StatusBadRequest)
+	encryptPWD := util.Sha1([]byte(pwd + pwdSalt))
+
+	pwdChecked := db.UserLogin(username, encryptPWD)
+	if !pwdChecked {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg":  "username or password verification failed",
+			"code": -1,
+		})
 		return
 	}
 	// generate token
 	token := GenToken(username)
 	// save the new token, and get res
-	updSuc := db.UpdateToken(username, token)
-	if !updSuc {
-		http.Error(w, "generate token failed", http.StatusInternalServerError)
+	updateOK := db.UpdateToken(username, token)
+	if !updateOK {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg":  "failed to update token",
+			"code": -2,
+		})
 		return
 	}
 	// redirect to home, however, by the return path to home instead
@@ -99,20 +83,20 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Code: 0,
 		Msg:  "OK",
 		Data: struct {
-			RedirPath string
-			Username  string
+			RedirectPath string
+			Username     string
+			Token        string
 		}{
-			RedirPath: "http://" + r.Host + "/static/view/home.html",
-			Username:  username,
+			RedirectPath: "/static/view/home.html",
+			Username:     username,
+			Token:        token,
 		},
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", token)
-	_, err = w.Write(resp.JSONBytes())
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	c.Data(http.StatusOK, "application/json", resp.JSONBytes())
+}
+
+func LoginHandler(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/static/view/signin.html")
 }
 
 func GenToken(username string) string {

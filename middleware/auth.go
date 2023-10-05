@@ -1,10 +1,14 @@
 package middleware
 
-import "net/http"
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
 
-func TokenAuth(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token := r.Header.Get("Authorization")
+func TokenAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//username := c.Request.FormValue("username")
+		token := c.GetHeader("Authorization")
 		//err := r.ParseForm()
 		//if err != nil {
 		//	http.Error(w, "wrong parameter", http.StatusBadRequest)
@@ -12,11 +16,11 @@ func TokenAuth(h http.HandlerFunc) http.HandlerFunc {
 		//}
 		//username := r.Form.Get("username")
 		if !IsTokenValid(token) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			c.Abort()
+			c.JSON(http.StatusOK, gin.H{"message": "unauthorized"})
 			return
 		}
-		// h(w, rd) is also right here
-		h.ServeHTTP(w, r)
+		c.Next()
 	}
 }
 
