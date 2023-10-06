@@ -1,6 +1,6 @@
 # hammer-cloud
 ## 项目介绍
-go web项目，使用httprouter和gin框架实现了两版，用了阿里云oss对象存储服务
+hammer-cloud，又名锤子云盘，是一个以学习为目的的go web项目，实现了httprouter和gin框架两版，主要技术用到了阿里云的oss对象存储服务，朴实无华的CRUD。
 ## 项目演示
 暂无
 ## 组织架构
